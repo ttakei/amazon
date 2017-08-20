@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<script type="text/javascript" src="jquery.js"></script>
+<script type="text/javascript" src="jquery.cookie.js"></script>
+<script type="text/javascript" src="jquery.csv2table.js"></script>
+</head>
+<body>
+<script type="text/javascript">
+$(function(){
+    var cookie_target_id = "#asin,#keywords";
+    var get_cookie_key = function(id) {
+        return "s_m_" + id;
+    };
+    var get_cookie = function(id) {
+        return $.cookie(get_cookie_key(id));
+    };
+    var set_cookie = function(id, value) {
+        var expire_day = 1000;
+        $.cookie(get_cookie_key(id), value, expire_day);
+    };
+    var save_input = function() {
+        $(cookie_target_id).each(function(){
+            set_cookie($(this).attr('id'), $(this).val());
+        });
+    };
+    var check_input_search = function() {
+        var required = "form#search .required";
+        var result = true;
+        $(required).each(function(){
+            if (!$(this).val()) {
+                var id = $(this).attr('id');
+                var label = $("label[for='"+id+"']").text();
+                window.alert(label+"を入力してください");
+                result = false;
+                return;
+            }
+        });
+        return result;
+    };
+
+    var load_jobs = function() {
+        $.when(
+            $('#jobs').csv2table('jobs.php')
+        ).done(function() {
+            // 削除ボタン
+            $(document).on("click", "#jobs .del", (function(){
+                var jobid = $(this).attr('id');
+                var fd = new FormData();
+                fd.append("jobid", jobid);
+                var post_data = {
+                    type : "POST",
+                    dataType : "text",
+                    data : fd,
+                    processData : false,
+                    contentType : false
+                };
+                $.ajax(
+                    "delete.php", post_data
+                ).done(function(text){
+                    window.alert("削除しました");
+                    load_jobs();
+                });
+                return false;
+            }));
+        });
+    };
+
+    $('form#search #submit').click(function(){
+        if (!check_input_search()) {
+            return false;
+        }
+
+        save_input();
+        var fd = new FormData();
+        fd.append("asin", $("#asin").val());
+        fd.append("keywords", $("#keywords").val());
+        var post_data = {
+            type : "POST",
+            dataType : "text",
+            data : fd,
+            processData : false,
+            contentType : false
+        };
+        $.ajax(
+            "search.php", post_data
+        ).done(function(text){
+            // window.alert(text);
+        });
+        window.alert("ジョブを登録しました");
+        load_jobs();
+        return false;
+    });
+
+    // set default value
+    $(cookie_target_id).each(function(){
+        var value = get_cookie($(this).attr('id'));
+        if (value) {
+            $(this).val(value);
+        }
+    });
+
+    load_jobs();
+});
+</script>
+<h2>商品検索登録</h2>
+<form id="search" method="post">
+
+<h3><label for="asin">ASIN</label></h3>
+<p>
+<input type="text" class="required" id="asin" name="asin" />
+</p>
+<h3><label for="keywords">検索キーワードリスト</label></h3>
+<p>
+<textarea class="required" id="keywords" name="keywords" rows="25" cols="100"></textarea>
+</p>
+<p>
+<input type="submit" name="submit" id="submit" value="実行" />
+</p>
+</form>
+<hr />
+
+<h2>検索結果</h2>
+<p id="jobs"></p>
+</body>
+</html>
