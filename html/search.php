@@ -18,7 +18,7 @@ function validate_input() {
 
 function issue_jobid($asin) {
     $date = date("Ymdhis");
-    return uniqid("{$asin}_{$date}");
+    return uniqid("{$asin}_{$date}_");
 }
 
 function main() {
