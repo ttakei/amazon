@@ -7,7 +7,7 @@ require_once("result.php");
 require_once("searcher.php");
 
 function validate_input() {
-    $required = array("asin", "keywords");
+    $required = array("keywords");
     foreach ($required as $id) {
         if (!isset($_POST[$id])) {
             return false;
@@ -30,7 +30,7 @@ function main() {
     if (!validate_input()) {
         $render->text_exit("入力が不正です", "400");
     }
-    $asin = $_POST["asin"];
+    $asin = isset($_POST["asin"]) ? $_POST["asin"] : "";
     $keywords_raw = $_POST["keywords"];
     $keywords = explode("\n", $keywords_raw);
    

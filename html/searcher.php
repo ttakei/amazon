@@ -55,6 +55,9 @@ class Searcher {
                     $this->logger->warning("could not extract item num $url");
                     return false;
                 }
+                if (empty($asin)) {
+                    return array("", "", $item_num);
+                }
             }
         
             $asin_list = $this->extract_asin_list($html);
