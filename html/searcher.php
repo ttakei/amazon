@@ -3,7 +3,7 @@
 require_once("logger.php");
 
 class Searcher {
-    const URL = "https://www.amazon.co.jp/s/";
+    const URL = "https://www.amazon.co.jp/gp/aw/s";
     const MAX_PAGE = 10;
 
     function __construct() {
@@ -14,8 +14,7 @@ class Searcher {
         $param = array(
             "page" => $page,
             "keywords" => $keyword,
-            "ie" => "UTF8",
-            "qid" => time(),
+            "sf" => "qz",
         );
         $url = self::URL. "?". http_build_query($param);
         return $url;
@@ -29,40 +28,47 @@ class Searcher {
         for ($page = 1; $page <= self::MAX_PAGE; $page++) {
             $url = $this->createPageUrl($keyword, $page);
             $header = array(
-                'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language:ja,en-US;q=0.8,en;q=0.6',
-                'Cache-Control:max-age=0',
-                'Connection:keep-alive',
-                'Host:www.amazon.co.jp',
-                'Upgrade-Insecure-Requests:1',
                 'User-Agent:Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Mobile Safari/537.36',
             );
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
-            $html = curl_exec($ch);
-            curl_close($ch);
+            $max_retry = 3;
+            for ($retry_cnt = 0; $retry_cnt < $max_retry; $retry_cnt++) {
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+                $html = curl_exec($ch);
+                curl_close($ch);
+            
+                if (empty($html)) {
+                    if ($retry_cnt == $max_retry - 1) {
+                        $this->logger->warning("failed request $url");
+                        return false;
+                    } else {
+                        continue;
+                    }
+                }
+                //file_put_contents("/tmp/$keyword.out", $html);
+                $html = str_replace(array("\r", "\n"), "", $html);
         
-            if (empty($html)) {
-                $this->logger->warning("failed request $url");
-                return false;
-            }
-            $html = str_replace(array("\r", "\n"), "", $html);
-    
-            if (!isset($item_num)) {    
-                $item_num = $this->extract_item_num($html);
-                if (empty($item_num)) {
-                    $this->logger->warning("could not extract item num $url");
-                    return false;
+                if (!isset($item_num)) {    
+                    $item_num = $this->extract_item_num($html);
+                    if (empty($item_num)) {
+                        if ($retry_cnt == $max_retry - 1) {
+                            $this->logger->warning("could not extract item num $url");
+                        } else {
+                            continue;
+                        }
+                    }
+                    if (empty($asin)) {
+                        return array("", "", $item_num);
+                    }
                 }
-                if (empty($asin)) {
-                    return array("", "", $item_num);
-                }
+                break;
             }
         
             $asin_list = $this->extract_asin_list($html);
             if (empty($asin_list)) {
-                break;
+                $this->logger->warning("could not extract asin list $url");
+                continue;
             }
     
             $this->logger->debug(sprintf("asin_list:%s", var_export($asin_list, true)));
@@ -78,9 +84,11 @@ class Searcher {
     }
 
     function extract_item_num($html) {
-        $regex = '|検索結果 ([0-9,]+)件|';
+        mb_regex_encoding("UTF-8");
+        $regex = '|検索結果 ([0-9, 以上]+)件|u';
         if (preg_match($regex, $html, $matches)) {
             $item_num = str_replace(",", "", $matches[1]);
+            $item_num = mb_convert_encoding($item_num, "SJIS", "UTF-8");
             return $item_num;
         } else {
             return false;
